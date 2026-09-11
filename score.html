@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>評分系統｜補助審查大公開</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="top-bar">
+    <a class="back-link" href="index.html">← 返回</a>
+    <h1>評分系統</h1>
+  </div>
+
+  <!-- 登入畫面 -->
+  <div id="view-login" class="card" style="display:none;">
+    <h2>輸入評分代碼</h2>
+    <p class="muted">請輸入主辦單位提供給你的代碼。</p>
+    <div id="login-msg"></div>
+    <label for="code-input">代碼</label>
+    <input type="text" id="code-input" placeholder="例如 A01" autocomplete="off" />
+    <button class="btn" id="login-btn" style="width:100%;">登入</button>
+  </div>
+
+  <!-- 計畫清單畫面 -->
+  <div id="view-list" style="display:none;">
+    <div class="card" style="margin-bottom:20px;">
+      <p class="muted" style="margin:0;">目前登入：<strong id="who" style="color:var(--ink);"></strong></p>
+      <button class="btn secondary small" id="logout-btn" style="margin-top:10px;">登出</button>
+    </div>
+    <div id="plan-list"></div>
+  </div>
+
+  <!-- 評分畫面 -->
+  <div id="view-score" style="display:none;">
+    <button class="btn secondary small" id="back-to-list" style="margin-bottom:16px;">← 返回計畫清單</button>
+    <div class="card">
+      <h2 id="score-plan-name"></h2>
+      <div id="save-msg"></div>
+      <div id="criteria-list"></div>
+      <div class="total-box">
+        <span>總分</span>
+        <span id="total-display">0 / 100</span>
+      </div>
+      <label for="comment-input">意見回饋</label>
+      <textarea id="comment-input" placeholder="給這份計畫書的具體意見……"></textarea>
+      <button class="btn" id="save-btn" style="width:100%;">儲存評分</button>
+      <p class="muted" style="margin-top:10px;">評分與回饋在活動結束前都可以回來修改。</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/firebase-init.js"></script>
+<script>
+const LS_KEY = "reviewer_code";
+let currentCode = null;
+let currentName = "";
+let plansCache = [];
+let activePlan = null;
+
+const $ = (id) => document.getElementById(id);
+
+function showView(name) {
+  ["login", "list", "score"].forEach((v) => {
+    $("view-" + v).style.display = v === name ? "block" : "none";
+  });
+}
+
+async function tryAutoLogin() {
+  const saved = localStorage.getItem(LS_KEY);
+  if (!saved) {
+    showView("login");
+    return;
+  }
+  const ok = await login(saved, true);
+  if (!ok) showView("login");
+}
+
+async function login(code, silent) {
+  code = (code || "").trim();
+  if (!code) return false;
+  try {
+    const doc = await db.collection("participants").doc(code).get();
+    if (!doc.exists) {
+      if (!silent) $("login-msg").innerHTML = `<div class="msg error">代碼不存在，請確認後再試一次。</div>`;
+      localStorage.removeItem(LS_KEY);
+      return false;
+    }
+    currentCode = code;
+    currentName = doc.data().name || code;
+    localStorage.setItem(LS_KEY, code);
+    $("who").textContent = `${currentName}（代碼：${currentCode}）`;
+    await loadPlanList();
+    showView("list");
+    return true;
+  } catch (e) {
+    console.error(e);
+    if (!silent) $("login-msg").innerHTML = `<div class="msg error">連線失敗，請稍後再試。</div>`;
+    return false;
+  }
+}
+
+$("login-btn").addEventListener("click", () => login($("code-input").value, false));
+$("code-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login($("code-input").value, false);
+});
+$("logout-btn").addEventListener("click", () => {
+  localStorage.removeItem(LS_KEY);
+  currentCode = null;
+  $("code-input").value = "";
+  $("login-msg").innerHTML = "";
+  showView("login");
+});
+$("back-to-list").addEventListener("click", () => {
+  loadPlanList();
+  showView("list");
+});
+
+async function loadPlanList() {
+  const listEl = $("plan-list");
+  listEl.innerHTML = `<p class="muted">載入中…</p>`;
+  const plansSnap = await db.collection("plans").orderBy("order").get();
+  plansCache = plansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const scoresSnap = await db.collection("scores").doc(currentCode).collection("entries").get();
+  const scoreMap = {};
+  scoresSnap.forEach((d) => (scoreMap[d.id] = d.data()));
+
+  if (plansCache.length === 0) {
+    listEl.innerHTML = `<div class="empty-state">主辦單位尚未上傳計畫書清單。</div>`;
+    return;
+  }
+
+  listEl.innerHTML = "";
+  plansCache.forEach((p) => {
+    const s = scoreMap[p.id];
+    const btn = document.createElement("button");
+    btn.className = "list-btn";
+    const statusText = s ? `已評分 ${calcTotal(s)} 分` : "尚未評分";
+    btn.innerHTML = `<span>${p.name}<br><span class="hint" style="font-weight:400;color:#7a8a7d;">${statusText}</span></span><span class="arrow">→</span>`;
+    btn.addEventListener("click", () => openScore(p, s));
+    listEl.appendChild(btn);
+  });
+}
+
+function openScore(plan, existing) {
+  activePlan = plan;
+  $("score-plan-name").textContent = plan.name;
+  $("save-msg").innerHTML = "";
+  $("comment-input").value = existing?.comment || "";
+
+  const wrap = $("criteria-list");
+  wrap.innerHTML = "";
+  CRITERIA.forEach((c) => {
+    const val = existing?.[c.key] ?? 0;
+    const item = document.createElement("div");
+    item.className = "score-item";
+    item.innerHTML = `
+      <div class="score-head">
+        <span class="name">${c.label}<span class="hint"> (滿分 ${c.max})</span></span>
+        <span class="value" id="val-${c.key}">${val}</span>
+      </div>
+      <input type="range" id="range-${c.key}" min="0" max="${c.max}" step="1" value="${val}" />
+    `;
+    wrap.appendChild(item);
+  });
+
+  CRITERIA.forEach((c) => {
+    $(`range-${c.key}`).addEventListener("input", updateTotal);
+  });
+  updateTotal();
+  showView("score");
+}
+
+function updateTotal() {
+  let total = 0;
+  CRITERIA.forEach((c) => {
+    const v = Number($(`range-${c.key}`).value);
+    $(`val-${c.key}`).textContent = v;
+    total += v;
+  });
+  $("total-display").textContent = `${total} / 100`;
+}
+
+$("save-btn").addEventListener("click", async () => {
+  if (!activePlan || !currentCode) return;
+  const payload = { code: currentCode, name: currentName, planId: activePlan.id, planName: activePlan.name };
+  CRITERIA.forEach((c) => (payload[c.key] = Number($(`range-${c.key}`).value)));
+  payload.comment = $("comment-input").value.trim();
+  payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  $("save-btn").disabled = true;
+  try {
+    await db.collection("scores").doc(currentCode).collection("entries").doc(activePlan.id).set(payload, { merge: true });
+    $("save-msg").innerHTML = `<div class="msg ok">已儲存！可以隨時回來修改。</div>`;
+  } catch (e) {
+    console.error(e);
+    $("save-msg").innerHTML = `<div class="msg error">儲存失敗，請確認網路連線後再試一次。</div>`;
+  }
+  $("save-btn").disabled = false;
+});
+
+tryAutoLogin();
+</script>
+</body>
+</html>

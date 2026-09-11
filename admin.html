@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>後台管理｜補助審查大公開</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="wrap" style="max-width: 960px;">
+  <div class="top-bar">
+    <a class="back-link" href="index.html">← 返回</a>
+    <h1>後台管理</h1>
+  </div>
+
+  <!-- 登入畫面 -->
+  <div id="view-login" class="card" style="display:none; max-width:420px;">
+    <h2>管理員登入</h2>
+    <div id="login-msg"></div>
+    <label for="email-input">帳號 Email</label>
+    <input type="email" id="email-input" autocomplete="username" />
+    <label for="pw-input">密碼</label>
+    <input type="password" id="pw-input" autocomplete="current-password" />
+    <button class="btn" id="login-btn" style="width:100%;">登入</button>
+  </div>
+
+  <!-- 主控台 -->
+  <div id="view-main" style="display:none;">
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>已登入：<strong id="who"></strong></span>
+      <button class="btn secondary small" id="logout-btn">登出</button>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="stage">階段控制</button>
+      <button class="tab-btn" data-tab="plans">計畫書管理</button>
+      <button class="tab-btn" data-tab="people">參與者名單</button>
+      <button class="tab-btn" data-tab="scores">評分總覽</button>
+    </div>
+
+    <!-- 階段控制 -->
+    <div class="tab-panel active" id="tab-stage">
+      <div class="card">
+        <h2>現場展示目前階段</h2>
+        <div id="stage-msg"></div>
+        <div class="big-buttons" style="margin-bottom:16px;">
+          <button class="btn stage-btn" data-stage="waiting">尚未開始</button>
+          <button class="btn stage-btn" data-stage="reading">計畫閱讀</button>
+          <button class="btn stage-btn" data-stage="review">計畫審查（即時排名）</button>
+          <button class="btn stage-btn" data-stage="feedback">總回饋</button>
+        </div>
+        <p class="muted">目前階段：<strong id="current-stage-label" style="color:var(--ink);">—</strong></p>
+      </div>
+
+      <div class="card">
+        <h2>計畫簡章連結</h2>
+        <label for="brochure-input">簡章 PDF 連結（Google Drive 分享連結）</label>
+        <input type="url" id="brochure-input" placeholder="https://drive.google.com/..." />
+        <button class="btn small" id="save-brochure-btn">儲存連結</button>
+      </div>
+
+      <div class="card">
+        <h2>「計畫閱讀」滿版文字</h2>
+        <textarea id="reading-input" placeholder="現場大螢幕在此階段顯示的文字內容"></textarea>
+        <button class="btn small" id="save-reading-btn">儲存內容</button>
+      </div>
+
+      <div class="card">
+        <h2>「總回饋」滿版文字</h2>
+        <textarea id="feedback-input" placeholder="現場大螢幕在此階段顯示的文字內容"></textarea>
+        <button class="btn small" id="save-feedback-btn">儲存內容</button>
+      </div>
+    </div>
+
+    <!-- 計畫書管理 -->
+    <div class="tab-panel" id="tab-plans">
+      <div class="card">
+        <h2>新增計畫書</h2>
+        <div class="inline-form">
+          <div>
+            <label>名稱</label>
+            <input type="text" id="plan-name-input" placeholder="例如：地震寫生計劃" />
+          </div>
+          <div>
+            <label>連結（Google Drive）</label>
+            <input type="url" id="plan-url-input" placeholder="https://drive.google.com/..." />
+          </div>
+          <div style="max-width:100px;">
+            <label>排序</label>
+            <input type="number" id="plan-order-input" value="1" />
+          </div>
+          <div style="flex:0 0 auto;">
+            <button class="btn small" id="add-plan-btn">新增</button>
+          </div>
+        </div>
+        <div id="plan-msg"></div>
+      </div>
+      <div class="card">
+        <h2>目前計畫書清單</h2>
+        <div id="plan-table-wrap"><p class="muted">載入中…</p></div>
+      </div>
+    </div>
+
+    <!-- 參與者名單 -->
+    <div class="tab-panel" id="tab-people">
+      <div class="card">
+        <h2>新增參與者</h2>
+        <div class="inline-form">
+          <div>
+            <label>代碼</label>
+            <input type="text" id="person-code-input" placeholder="例如：A01" />
+          </div>
+          <div>
+            <label>姓名（選填）</label>
+            <input type="text" id="person-name-input" placeholder="王小明" />
+          </div>
+          <div style="flex:0 0 auto;">
+            <button class="btn small" id="add-person-btn">新增</button>
+          </div>
+        </div>
+        <div id="person-msg"></div>
+      </div>
+      <div class="card">
+        <h2>批次新增</h2>
+        <p class="muted">每行一組，格式：代碼,姓名（姓名可省略）</p>
+        <textarea id="bulk-input" placeholder="A01,王小明&#10;A02,陳小華&#10;A03"></textarea>
+        <button class="btn small" id="bulk-add-btn">批次新增</button>
+        <div id="bulk-msg"></div>
+      </div>
+      <div class="card">
+        <h2>目前參與者名單</h2>
+        <div id="people-table-wrap"><p class="muted">載入中…</p></div>
+      </div>
+    </div>
+
+    <!-- 評分總覽 -->
+    <div class="tab-panel" id="tab-scores">
+      <div class="card">
+        <h2>所有評分與回饋</h2>
+        <label for="filter-plan">篩選計畫書</label>
+        <select id="filter-plan"><option value="">全部</option></select>
+        <div id="scores-table-wrap"><p class="muted">載入中…</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/firebase-init.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

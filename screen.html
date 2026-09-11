@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>現場展示｜補助審查大公開</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="screen-body">
+
+<div id="stage-waiting" style="display:none;">
+  <div class="eyebrow">2026 花蓮縣社造學堂</div>
+  <h2 style="font-size:2rem;">補助審查大公開：一起嘗試當審查委員</h2>
+  <p class="muted">活動即將開始，請稍候……</p>
+</div>
+
+<div id="stage-reading" style="display:none;" class="screen-fulltext">
+  <h2>計畫閱讀</h2>
+  <div id="reading-text"></div>
+</div>
+
+<div id="stage-review" style="display:none; width:100%;">
+  <h2 style="font-size:2rem; color:var(--yellow); margin-bottom:24px;">計畫審查・即時排名</h2>
+  <div id="rank-list" class="rank-table" style="margin:0 auto;"></div>
+  <div id="detail-panel" style="display:none; max-width:800px; margin:20px auto 0; text-align:left;">
+    <button class="btn secondary small" id="close-detail" style="margin-bottom:14px;">← 返回排名</button>
+    <h2 id="detail-title" style="color:var(--yellow);"></h2>
+    <div id="detail-list"></div>
+  </div>
+</div>
+
+<div id="stage-feedback" style="display:none;" class="screen-fulltext">
+  <h2>總回饋</h2>
+  <div id="feedback-text"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/firebase-init.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let plansCache = [];
+let entriesByPlan = {};
+
+function showStage(stage) {
+  ["waiting", "reading", "review", "feedback"].forEach((s) => {
+    $("stage-" + s).style.display = s === stage ? "block" : "none";
+  });
+  if (stage === "review") {
+    $("detail-panel").style.display = "none";
+  }
+}
+
+db.collection("config").doc("state").onSnapshot((snap) => {
+  const data = snap.exists ? snap.data() : {};
+  const stage = data.stage || "waiting";
+  showStage(stage);
+  $("reading-text").textContent = data.readingText || "（尚未設定內容）";
+  $("feedback-text").textContent = data.feedbackText || "（尚未設定內容）";
+}, (err) => console.error(err));
+
+db.collection("plans").orderBy("order").onSnapshot((snap) => {
+  plansCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  renderRanking();
+});
+
+db.collectionGroup("entries").onSnapshot((snap) => {
+  entriesByPlan = {};
+  snap.forEach((doc) => {
+    const e = doc.data();
+    if (!e.planId) return;
+    if (!entriesByPlan[e.planId]) entriesByPlan[e.planId] = [];
+    entriesByPlan[e.planId].push(e);
+  });
+  renderRanking();
+}, (err) => console.error(err));
+
+function renderRanking() {
+  const rankList = $("rank-list");
+  const rows = plansCache.map((p) => {
+    const entries = entriesByPlan[p.id] || [];
+    const avg = entries.length
+      ? entries.reduce((sum, e) => sum + calcTotal(e), 0) / entries.length
+      : 0;
+    return { plan: p, avg, count: entries.length };
+  });
+  rows.sort((a, b) => b.avg - a.avg);
+
+  if (rows.length === 0) {
+    rankList.innerHTML = `<div class="empty-state">尚無計畫書資料。</div>`;
+    return;
+  }
+
+  rankList.innerHTML = "";
+  rows.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+    row.innerHTML = `
+      <span class="rank-num">${i + 1}</span>
+      <span class="rank-name">${r.plan.name}<br><span class="hint">已評分 ${r.count} 人</span></span>
+      <span class="rank-score">${r.avg.toFixed(1)}</span>
+    `;
+    row.addEventListener("click", () => showDetail(r.plan));
+    rankList.appendChild(row);
+  });
+}
+
+function showDetail(plan) {
+  document.getElementById("rank-list").style.display = "none";
+  $("detail-panel").style.display = "block";
+  $("detail-title").textContent = plan.name;
+
+  const entries = entriesByPlan[plan.id] || [];
+  const listEl = $("detail-list");
+  if (entries.length === 0) {
+    listEl.innerHTML = `<div class="empty-state">尚無人評分。</div>`;
+    return;
+  }
+  listEl.innerHTML = "";
+  entries.forEach((e) => {
+    const item = document.createElement("div");
+    item.className = "feedback-item";
+    const scoreParts = CRITERIA.map((c) => `${c.label} ${e[c.key] ?? 0}`).join("・");
+    item.innerHTML = `
+      <div class="fi-head"><span>${e.name || e.code}</span><span>${calcTotal(e)} 分</span></div>
+      <div class="fi-scores">${scoreParts}</div>
+      <div>${e.comment ? e.comment.replace(/</g, "&lt;") : "（無文字回饋）"}</div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+$("close-detail").addEventListener("click", () => {
+  $("detail-panel").style.display = "none";
+  document.getElementById("rank-list").style.display = "block";
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// 花蓮社造學堂｜補助審查大公開 — Firestore 安全規則
+// 使用方式：Firebase 主控台 → Firestore Database → 規則，貼上本檔內容後「發布」。
+// 請把下面 ADMIN_EMAIL 換成你在 Authentication 建立的管理員帳號 Email。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "ADMIN_EMAIL";
+    }
+
+    // 現場展示的階段狀態與滿版文字：所有人可讀，只有管理員可寫
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 計畫書清單（名稱＋連結）：所有人可讀，只有管理員可寫
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 參與者代碼名單：允許用代碼單筆查詢（登入驗證用），
+    // 但不開放列出整份名單，避免代碼被任意人窮舉出來
+    match /participants/{code} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 評分與回饋：所有人可讀（供現場排名與回饋顯示），
+    // 但只有在 code 確實存在於 participants 名單中，才允許寫入該 code 底下的評分
+    match /scores/{code} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /entries/{planId} {
+        allow read: if true;
+        allow write: if isAdmin() || exists(/databases/$(database)/documents/participants/$(code));
+      }
+    }
+  }
+}

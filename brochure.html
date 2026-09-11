@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>計畫簡章｜補助審查大公開</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="top-bar">
+    <a class="back-link" href="index.html">← 返回</a>
+    <h1>計畫簡章</h1>
+  </div>
+
+  <div class="card" id="content">
+    <p class="muted">載入中…</p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/firebase-init.js"></script>
+<script>
+async function load() {
+  const el = document.getElementById("content");
+  try {
+    const snap = await db.collection("config").doc("state").get();
+    const data = snap.exists ? snap.data() : {};
+    if (data.brochureUrl) {
+      el.innerHTML = `
+        <h2>活動簡章</h2>
+        <p>點下方按鈕開啟簡章 PDF（開新分頁）。</p>
+        <a class="btn" href="${data.brochureUrl}" target="_blank" rel="noopener">開啟簡章 PDF</a>
+      `;
+    } else {
+      el.innerHTML = `<p class="muted">主辦單位尚未設定簡章連結，請稍候再試。</p>`;
+    }
+  } catch (e) {
+    el.innerHTML = `<p class="muted">讀取失敗，請確認網路連線後重新整理。</p>`;
+    console.error(e);
+  }
+}
+load();
+</script>
+</body>
+</html>
