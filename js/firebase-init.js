@@ -24,3 +24,22 @@ const STAGE_LABELS = {
 function calcTotal(scoreDoc) {
   return CRITERIA.reduce((sum, c) => sum + (Number(scoreDoc[c.key]) || 0), 0);
 }
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    '"': "&quot;",
+  })[char]);
+}
+
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}

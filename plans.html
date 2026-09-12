@@ -3,24 +3,27 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1e3a2f" />
 <title>計畫書內容｜補助審查大公開</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div class="wrap">
+<a class="skip-link" href="#main-content">跳到主要內容</a>
+<main class="wrap" id="main-content">
   <div class="top-bar">
     <a class="back-link" href="index.html">← 返回</a>
     <h1>計畫書內容</h1>
   </div>
   <p class="muted" style="margin-top:-8px;">點選計畫書名稱開啟內容（PDF）</p>
 
-  <div id="list" style="margin-top:16px;">
+  <div id="list" style="margin-top:16px;" aria-live="polite" aria-busy="true">
     <p class="muted">載入中…</p>
   </div>
-</div>
+</main>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
@@ -29,25 +32,40 @@
 <script>
 async function load() {
   const list = document.getElementById("list");
+  list.setAttribute("aria-busy", "true");
   try {
     const snap = await db.collection("plans").orderBy("order").get();
     if (snap.empty) {
       list.innerHTML = `<div class="empty-state">主辦單位尚未上傳計畫書清單。</div>`;
+      list.setAttribute("aria-busy", "false");
       return;
     }
     list.innerHTML = "";
     snap.forEach((doc) => {
       const p = doc.data();
-      const a = document.createElement("a");
-      a.className = "list-btn";
-      a.href = p.url || "#";
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.innerHTML = `<span>${p.name || "（未命名計畫）"}</span><span class="arrow">→</span>`;
-      list.appendChild(a);
+      const url = safeExternalUrl(p.url);
+      const item = document.createElement(url ? "a" : "div");
+      item.className = "list-btn";
+      if (url) {
+        item.href = url;
+        item.target = "_blank";
+        item.rel = "noopener";
+      } else {
+        item.setAttribute("aria-disabled", "true");
+      }
+      const name = document.createElement("span");
+      name.textContent = p.name || "（未命名計畫）";
+      const action = document.createElement("span");
+      action.className = "arrow";
+      action.textContent = url ? "↗" : "尚未提供";
+      item.append(name, action);
+      list.appendChild(item);
     });
+    list.setAttribute("aria-busy", "false");
   } catch (e) {
-    list.innerHTML = `<p class="muted">讀取失敗，請確認網路連線後重新整理。</p>`;
+    list.innerHTML = `<div class="empty-state"><p>目前無法讀取計畫書，請確認網路連線。</p><button class="btn small" type="button" id="retry-plans">重新載入</button></div>`;
+    document.getElementById("retry-plans").addEventListener("click", load);
+    list.setAttribute("aria-busy", "false");
     console.error(e);
   }
 }

@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1e3a2f" />
 <title>現場展示｜補助審查大公開</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet" />
@@ -23,6 +25,7 @@
 
 <div id="stage-review" style="display:none; width:100%;">
   <h2 style="font-size:2rem; color:var(--yellow); margin-bottom:24px;">計畫審查・即時排名</h2>
+  <p class="screen-status" id="screen-status" role="status" aria-live="polite">正在同步最新結果…</p>
   <div id="rank-list" class="rank-table" style="margin:0 auto;"></div>
   <div id="detail-panel" style="display:none; max-width:800px; margin:20px auto 0; text-align:left;">
     <button class="btn secondary small" id="close-detail" style="margin-bottom:14px;">← 返回排名</button>
@@ -40,12 +43,17 @@ const $ = (id) => document.getElementById(id);
 let plansCache = [];
 let entriesByPlan = {};
 
+function updateScreenStatus(message) {
+  $("screen-status").textContent = message || `最後更新：${new Intl.DateTimeFormat("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`;
+}
+
 function showStage(stage) {
   ["waiting", "text", "review"].forEach((s) => {
     $("stage-" + s).style.display = s === stage ? "block" : "none";
   });
   if (stage === "review") {
     $("detail-panel").style.display = "none";
+    $("rank-list").style.display = "block";
   }
 }
 
@@ -54,11 +62,16 @@ db.collection("config").doc("state").onSnapshot((snap) => {
   const stage = data.stage || "waiting";
   showStage(stage);
   $("display-text").textContent = data.displayText || "（尚未設定內容）";
-}, (err) => console.error(err));
+  updateScreenStatus();
+}, (err) => {
+  updateScreenStatus("同步中斷，正在等待重新連線…");
+  console.error(err);
+});
 
 db.collection("plans").orderBy("order").onSnapshot((snap) => {
   plansCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   renderRanking();
+  updateScreenStatus();
 });
 
 db.collectionGroup("entries").onSnapshot((snap) => {
@@ -70,7 +83,11 @@ db.collectionGroup("entries").onSnapshot((snap) => {
     entriesByPlan[e.planId].push(e);
   });
   renderRanking();
-}, (err) => console.error(err));
+  updateScreenStatus();
+}, (err) => {
+  updateScreenStatus("同步中斷，正在等待重新連線…");
+  console.error(err);
+});
 
 function renderRanking() {
   const rankList = $("rank-list");
@@ -90,11 +107,12 @@ function renderRanking() {
 
   rankList.innerHTML = "";
   rows.forEach((r, i) => {
-    const row = document.createElement("div");
+    const row = document.createElement("button");
+    row.type = "button";
     row.className = "rank-row" + (i < 3 ? " top3" : "");
     row.innerHTML = `
       <span class="rank-num">${i + 1}</span>
-      <span class="rank-name">${r.plan.name}<br><span class="hint">已評分 ${r.count} 人</span></span>
+      <span class="rank-name">${escapeHtml(r.plan.name)}<br><span class="hint">已評分 ${r.count} 人</span></span>
       <span class="rank-score">${r.avg.toFixed(1)}</span>
     `;
     row.addEventListener("click", () => showDetail(r.plan));
@@ -117,11 +135,11 @@ function showDetail(plan) {
   entries.forEach((e) => {
     const item = document.createElement("div");
     item.className = "feedback-item";
-    const scoreParts = CRITERIA.map((c) => `${c.label} ${e[c.key] ?? 0}`).join("・");
+    const scoreParts = CRITERIA.map((c) => `${c.label} ${Number(e[c.key]) || 0}`).join("・");
     item.innerHTML = `
-      <div class="fi-head"><span>${e.name || e.code}</span><span class="fi-score">${calcTotal(e)} 分</span></div>
-      <div class="fi-scores">${scoreParts}</div>
-      <div class="fi-comment">${e.comment ? e.comment.replace(/</g, "&lt;") : "（無文字回饋）"}</div>
+      <div class="fi-head"><span>${escapeHtml(e.name || e.code)}</span><span class="fi-score">${calcTotal(e)} 分</span></div>
+      <div class="fi-scores">${escapeHtml(scoreParts)}</div>
+      <div class="fi-comment">${e.comment ? escapeHtml(e.comment) : "（無文字回饋）"}</div>
     `;
     listEl.appendChild(item);
   });

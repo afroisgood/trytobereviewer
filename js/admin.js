@@ -22,7 +22,7 @@ $("login-btn").addEventListener("click", async () => {
   try {
     await auth.signInWithEmailAndPassword(email, pw);
   } catch (e) {
-    $("login-msg").innerHTML = `<div class="msg error">登入失敗：${e.message}</div>`;
+    $("login-msg").innerHTML = `<div class="msg error">登入失敗：${escapeHtml(e.message)}</div>`;
   }
 });
 
@@ -31,10 +31,31 @@ $("logout-btn").addEventListener("click", () => auth.signOut());
 // ---------- Tabs ----------
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach((b) => {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+      b.tabIndex = -1;
+    });
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
+    btn.tabIndex = 0;
     $("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+const tabButtons = [...document.querySelectorAll(".tab-btn")];
+tabButtons.forEach((btn, index) => {
+  btn.addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    let next = index;
+    if (e.key === "ArrowLeft") next = (index - 1 + tabButtons.length) % tabButtons.length;
+    if (e.key === "ArrowRight") next = (index + 1) % tabButtons.length;
+    if (e.key === "Home") next = 0;
+    if (e.key === "End") next = tabButtons.length - 1;
+    tabButtons[next].click();
+    tabButtons[next].focus();
   });
 });
 
@@ -51,11 +72,14 @@ function initMain() {
 // ---------- 階段控制 ----------
 document.querySelectorAll(".stage-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
+    document.querySelectorAll(".stage-btn").forEach((item) => (item.disabled = true));
     try {
       await db.collection("config").doc("state").set({ stage: btn.dataset.stage }, { merge: true });
       $("stage-msg").innerHTML = `<div class="msg ok">已切換至「${STAGE_LABELS[btn.dataset.stage]}」</div>`;
     } catch (e) {
-      $("stage-msg").innerHTML = `<div class="msg error">切換失敗：${e.message}</div>`;
+      $("stage-msg").innerHTML = `<div class="msg error">切換失敗：${escapeHtml(e.message)}</div>`;
+    } finally {
+      document.querySelectorAll(".stage-btn").forEach((item) => (item.disabled = false));
     }
   });
 });
@@ -64,16 +88,35 @@ function watchStage() {
   db.collection("config").doc("state").onSnapshot((snap) => {
     const data = snap.exists ? snap.data() : {};
     $("current-stage-label").textContent = STAGE_LABELS[data.stage || "waiting"];
+    document.querySelectorAll(".stage-btn").forEach((btn) => {
+      btn.setAttribute("aria-pressed", String(btn.dataset.stage === (data.stage || "waiting")));
+    });
     if (document.activeElement !== $("brochure-input")) $("brochure-input").value = data.brochureUrl || "";
     if (document.activeElement !== $("display-text-input")) $("display-text-input").value = data.displayText || "";
   });
 }
 
+async function saveConfig(button, messageId, payload, successText) {
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = "儲存中…";
+  try {
+    await db.collection("config").doc("state").set(payload, { merge: true });
+    $(messageId).innerHTML = `<div class="msg ok">${successText}</div>`;
+  } catch (e) {
+    $(messageId).innerHTML = `<div class="msg error">儲存失敗，請確認連線後再試。</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
 $("save-brochure-btn").addEventListener("click", () =>
-  db.collection("config").doc("state").set({ brochureUrl: $("brochure-input").value.trim() }, { merge: true })
+  (!$("brochure-input").value.trim() || safeExternalUrl($("brochure-input").value.trim()))
+    ? saveConfig($("save-brochure-btn"), "brochure-msg", { brochureUrl: $("brochure-input").value.trim() }, "簡章連結已儲存。")
+    : ($("brochure-msg").innerHTML = `<div class="msg error">請輸入有效的 http 或 https 連結。</div>`)
 );
 $("save-display-text-btn").addEventListener("click", () =>
-  db.collection("config").doc("state").set({ displayText: $("display-text-input").value }, { merge: true })
+  saveConfig($("save-display-text-btn"), "display-msg", { displayText: $("display-text-input").value }, "展示文字已儲存。")
 );
 
 // ---------- 計畫書管理 ----------
@@ -83,6 +126,10 @@ $("add-plan-btn").addEventListener("click", async () => {
   const order = Number($("plan-order-input").value) || 0;
   if (!name) {
     $("plan-msg").innerHTML = `<div class="msg error">請輸入名稱。</div>`;
+    return;
+  }
+  if (url && !safeExternalUrl(url)) {
+    $("plan-msg").innerHTML = `<div class="msg error">請輸入有效的 http 或 https 連結。</div>`;
     return;
   }
   try {
@@ -112,10 +159,10 @@ function renderPlanTable() {
   let html = `<table class="admin-table"><tr><th>排序</th><th>名稱</th><th>連結</th><th></th></tr>`;
   plansCache.forEach((p) => {
     html += `<tr>
-      <td>${p.order ?? ""}</td>
-      <td>${p.name}</td>
-      <td>${p.url ? `<a class="icon-link" href="${p.url}" target="_blank" rel="noopener">開啟</a>` : "（無）"}</td>
-      <td><button class="btn small secondary" data-del-plan="${p.id}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
+      <td>${escapeHtml(p.order ?? "")}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${safeExternalUrl(p.url) ? `<a class="icon-link" href="${escapeHtml(safeExternalUrl(p.url))}" target="_blank" rel="noopener">開啟 ↗</a>` : "（無）"}</td>
+      <td><button class="btn small secondary" data-del-plan="${escapeHtml(p.id)}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
     </tr>`;
   });
   html += `</table>`;
@@ -176,9 +223,9 @@ function watchPeople() {
     snap.forEach((doc) => {
       const p = doc.data();
       html += `<tr>
-        <td>${doc.id}</td>
-        <td>${p.name || ""}</td>
-        <td><button class="btn small secondary" data-del-person="${doc.id}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
+        <td>${escapeHtml(doc.id)}</td>
+        <td>${escapeHtml(p.name || "")}</td>
+        <td><button class="btn small secondary" data-del-person="${escapeHtml(doc.id)}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
       </tr>`;
     });
     html += `</table>`;
@@ -196,7 +243,7 @@ function watchPeople() {
 function renderPlanFilter() {
   const sel = $("filter-plan");
   const current = sel.value;
-  sel.innerHTML = `<option value="">全部</option>` + plansCache.map((p) => `<option value="${p.id}">${p.name}</option>`).join("");
+  sel.innerHTML = `<option value="">全部</option>` + plansCache.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join("");
   sel.value = current;
 }
 $("filter-plan").addEventListener("change", renderScoresTable);
@@ -223,13 +270,13 @@ function renderScoresTable() {
     .sort((a, b) => (a.planName || "").localeCompare(b.planName || ""))
     .forEach((e) => {
       html += `<tr>
-        <td>${e.planName || e.planId}</td>
-        <td>${e.code}</td>
-        <td>${e.name || ""}</td>`;
+        <td>${escapeHtml(e.planName || e.planId)}</td>
+        <td>${escapeHtml(e.code)}</td>
+        <td>${escapeHtml(e.name || "")}</td>`;
       CRITERIA.forEach((c) => (html += `<td>${e[c.key] ?? 0}</td>`));
       html += `<td><strong>${calcTotal(e)}</strong></td>
-        <td>${(e.comment || "").replace(/</g, "&lt;")}</td>
-        <td><button class="btn small secondary" data-del-score="${e.code}|${e.planId}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
+        <td>${escapeHtml(e.comment || "")}</td>
+        <td><button class="btn small secondary" data-del-score="${escapeHtml(e.code)}|${escapeHtml(e.planId)}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
       </tr>`;
     });
   html += `</table>`;

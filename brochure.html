@@ -3,23 +3,26 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1e3a2f" />
 <title>計畫簡章｜補助審查大公開</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div class="wrap">
+<a class="skip-link" href="#main-content">跳到主要內容</a>
+<main class="wrap" id="main-content">
   <div class="top-bar">
     <a class="back-link" href="index.html">← 返回</a>
     <h1>計畫簡章</h1>
   </div>
 
-  <div class="card" id="content">
+  <div class="card" id="content" aria-live="polite" aria-busy="true">
     <p class="muted">載入中…</p>
   </div>
-</div>
+</main>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
@@ -28,20 +31,25 @@
 <script>
 async function load() {
   const el = document.getElementById("content");
+  el.setAttribute("aria-busy", "true");
   try {
     const snap = await db.collection("config").doc("state").get();
     const data = snap.exists ? snap.data() : {};
-    if (data.brochureUrl) {
+    const brochureUrl = safeExternalUrl(data.brochureUrl);
+    if (brochureUrl) {
       el.innerHTML = `
         <h2>活動簡章</h2>
         <p>點下方按鈕開啟簡章 PDF（開新分頁）。</p>
-        <a class="btn" href="${data.brochureUrl}" target="_blank" rel="noopener">開啟簡章 PDF</a>
+        <a class="btn" href="${escapeHtml(brochureUrl)}" target="_blank" rel="noopener">開啟簡章 PDF ↗</a>
       `;
     } else {
       el.innerHTML = `<p class="muted">主辦單位尚未設定簡章連結，請稍候再試。</p>`;
     }
+    el.setAttribute("aria-busy", "false");
   } catch (e) {
-    el.innerHTML = `<p class="muted">讀取失敗，請確認網路連線後重新整理。</p>`;
+    el.innerHTML = `<div class="empty-state"><p>目前無法讀取簡章，請確認網路連線。</p><button class="btn small" type="button" id="retry-brochure">重新載入</button></div>`;
+    document.getElementById("retry-brochure").addEventListener("click", load);
+    el.setAttribute("aria-busy", "false");
     console.error(e);
   }
 }

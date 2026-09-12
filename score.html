@@ -3,28 +3,31 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1e3a2f" />
 <title>評分系統｜補助審查大公開</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<div class="wrap">
+<a class="skip-link" href="#main-content">跳到主要內容</a>
+<main class="wrap" id="main-content">
   <div class="top-bar">
     <a class="back-link" href="index.html">← 返回</a>
     <h1 style="flex:1;">評分系統</h1>
-    <button class="btn secondary small" id="logout-btn" style="display:none;">登出</button>
+    <button class="btn secondary small" id="logout-btn" style="display:none;">更換代碼</button>
   </div>
 
   <!-- 登入畫面 -->
   <div id="view-login" class="card" style="display:none;">
     <h2>輸入評分代碼</h2>
     <p class="muted">請輸入主辦單位提供給你的代碼。</p>
-    <div id="login-msg"></div>
+    <div id="login-msg" role="status" aria-live="polite"></div>
     <label for="code-input">代碼</label>
-    <input type="text" id="code-input" placeholder="例如 A01" autocomplete="off" />
-    <button class="btn" id="login-btn" style="width:100%;">登入</button>
+    <input type="text" id="code-input" placeholder="例如 A01" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+    <button class="btn" id="login-btn" style="width:100%;">進入評分</button>
   </div>
 
   <!-- 計畫清單畫面 -->
@@ -32,15 +35,22 @@
     <div class="card" style="margin-bottom:20px;">
       <p class="muted" style="margin:0;">目前登入：<strong id="who" style="color:var(--ink);"></strong></p>
     </div>
-    <div id="plan-list"></div>
+    <div id="plan-list" aria-live="polite" aria-busy="false"></div>
   </div>
 
   <!-- 評分畫面 -->
   <div id="view-score" style="display:none;">
     <button class="btn secondary small" id="back-to-list" style="margin-bottom:16px;">← 返回計畫清單</button>
     <div class="card">
-      <h2 id="score-plan-name"></h2>
-      <div id="save-msg"></div>
+      <div class="progress-block" aria-label="評分進度">
+        <div class="progress-meta"><span id="progress-label">第 1 / 1 份</span><span id="progress-done">已完成 0 份</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="plan-toolbar">
+        <h2 id="score-plan-name"></h2>
+        <a class="btn secondary-on-light small" id="open-plan-link" target="_blank" rel="noopener">開啟計畫書 ↗</a>
+      </div>
+      <div id="save-msg" role="status" aria-live="polite"></div>
       <div id="criteria-list"></div>
       <div class="total-box">
         <span>總分</span>
@@ -48,11 +58,15 @@
       </div>
       <label for="comment-input">意見回饋</label>
       <textarea id="comment-input" placeholder="給這份計畫書的具體意見……"></textarea>
-      <button class="btn" id="save-btn" style="width:100%;">儲存評分</button>
-      <p class="muted" style="margin-top:10px;">評分與回饋在活動結束前都可以回來修改。</p>
+      <div class="score-actions">
+        <button class="btn" id="save-btn" style="width:100%;">儲存評分</button>
+        <button class="btn secondary-on-light" id="next-plan-btn" type="button" hidden>下一份計畫 →</button>
+      </div>
+      <p class="save-state" id="save-state" role="status" aria-live="polite">尚未修改</p>
+      <p class="muted" style="margin-top:10px;">每個項目都要評分；活動結束前可隨時回來修改。</p>
     </div>
   </div>
-</div>
+</main>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
@@ -64,6 +78,9 @@ let currentCode = null;
 let currentName = "";
 let plansCache = [];
 let activePlan = null;
+let scoreMap = {};
+let dirty = false;
+let touchedCriteria = new Set();
 
 const $ = (id) => document.getElementById(id);
 
@@ -72,6 +89,18 @@ function showView(name) {
     $("view-" + v).style.display = v === name ? "block" : "none";
   });
   $("logout-btn").style.display = name === "login" ? "none" : "inline-block";
+}
+
+function setDirty(value) {
+  dirty = value;
+  if (value) {
+    $("save-state").textContent = "有尚未儲存的變更";
+    $("next-plan-btn").hidden = true;
+  }
+}
+
+function canLeaveScore() {
+  return !dirty || confirm("這份評分尚未儲存，確定要離開嗎？");
 }
 
 async function tryAutoLogin() {
@@ -85,7 +114,7 @@ async function tryAutoLogin() {
 }
 
 async function login(code, silent) {
-  code = (code || "").trim();
+  code = (code || "").trim().toUpperCase();
   if (!code) return false;
   try {
     const doc = await db.collection("participants").doc(code).get();
@@ -113,6 +142,7 @@ $("code-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") login($("code-input").value, false);
 });
 $("logout-btn").addEventListener("click", () => {
+  if (!canLeaveScore()) return;
   localStorage.removeItem(LS_KEY);
   currentCode = null;
   $("code-input").value = "";
@@ -120,22 +150,32 @@ $("logout-btn").addEventListener("click", () => {
   showView("login");
 });
 $("back-to-list").addEventListener("click", () => {
+  if (!canLeaveScore()) return;
+  dirty = false;
   loadPlanList();
   showView("list");
 });
 
+window.addEventListener("beforeunload", (e) => {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
 async function loadPlanList() {
   const listEl = $("plan-list");
+  listEl.setAttribute("aria-busy", "true");
   listEl.innerHTML = `<p class="muted">載入中…</p>`;
   const plansSnap = await db.collection("plans").orderBy("order").get();
   plansCache = plansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   const scoresSnap = await db.collection("scores").doc(currentCode).collection("entries").get();
-  const scoreMap = {};
+  scoreMap = {};
   scoresSnap.forEach((d) => (scoreMap[d.id] = d.data()));
 
   if (plansCache.length === 0) {
     listEl.innerHTML = `<div class="empty-state">主辦單位尚未上傳計畫書清單。</div>`;
+    listEl.setAttribute("aria-busy", "false");
     return;
   }
 
@@ -144,18 +184,42 @@ async function loadPlanList() {
     const s = scoreMap[p.id];
     const btn = document.createElement("button");
     btn.className = "list-btn";
-    const statusText = s ? `已評分 ${calcTotal(s)} 分` : "尚未評分";
-    btn.innerHTML = `<span>${p.name}<br><span class="hint" style="font-weight:400;color:#7a8a7d;">${statusText}</span></span><span class="arrow">→</span>`;
+    const content = document.createElement("span");
+    const name = document.createElement("span");
+    name.textContent = p.name || "（未命名計畫）";
+    const status = document.createElement("span");
+    status.className = "plan-status" + (s ? " done" : "");
+    status.textContent = s ? `✓ 已評分 ${calcTotal(s)} 分` : "尚未評分";
+    content.append(name, document.createElement("br"), status);
+    const arrow = document.createElement("span");
+    arrow.className = "arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    btn.append(content, arrow);
     btn.addEventListener("click", () => openScore(p, s));
     listEl.appendChild(btn);
   });
+  listEl.setAttribute("aria-busy", "false");
 }
 
 function openScore(plan, existing) {
   activePlan = plan;
+  dirty = false;
+  touchedCriteria = new Set(existing ? CRITERIA.map((c) => c.key) : []);
   $("score-plan-name").textContent = plan.name;
+  const planUrl = safeExternalUrl(plan.url);
+  $("open-plan-link").href = planUrl || "#";
+  $("open-plan-link").hidden = !planUrl;
   $("save-msg").innerHTML = "";
+  $("save-state").textContent = existing ? "已載入先前評分" : "請完成所有評分項目";
+  $("next-plan-btn").hidden = true;
   $("comment-input").value = existing?.comment || "";
+
+  const index = plansCache.findIndex((p) => p.id === plan.id);
+  const done = plansCache.filter((item) => scoreMap[item.id]).length;
+  $("progress-label").textContent = `第 ${index + 1} / ${plansCache.length} 份`;
+  $("progress-done").textContent = `已完成 ${done} 份`;
+  $("progress-fill").style.width = `${plansCache.length ? (done / plansCache.length) * 100 : 0}%`;
 
   const wrap = $("criteria-list");
   wrap.innerHTML = "";
@@ -165,47 +229,101 @@ function openScore(plan, existing) {
     item.className = "score-item";
     item.innerHTML = `
       <div class="score-head">
-        <span class="name">${c.label}<span class="hint"> (滿分 ${c.max})</span></span>
-        <span class="value" id="val-${c.key}">${val}</span>
+        <label class="name" for="range-${c.key}">${c.label}<span class="hint">（滿分 ${c.max}）</span></label>
+        <output class="value" id="val-${c.key}" for="range-${c.key}">${existing ? val : "尚未評分"}</output>
       </div>
-      <input type="range" id="range-${c.key}" min="0" max="${c.max}" step="1" value="${val}" />
+      <div class="score-control">
+        <input type="range" id="range-${c.key}" min="0" max="${c.max}" step="1" value="${val}" aria-describedby="range-help-${c.key}" />
+        <input class="score-number" type="number" id="number-${c.key}" min="0" max="${c.max}" step="1" value="${existing ? val : ""}" aria-label="${c.label}分數，滿分 ${c.max}" inputmode="numeric" />
+      </div>
+      <div class="range-labels" id="range-help-${c.key}"><span>0 分</span><span>${c.max} 分</span></div>
     `;
     wrap.appendChild(item);
   });
 
   CRITERIA.forEach((c) => {
-    $(`range-${c.key}`).addEventListener("input", updateTotal);
+    const range = $(`range-${c.key}`);
+    const number = $(`number-${c.key}`);
+    range.addEventListener("input", () => {
+      number.value = range.value;
+      touchedCriteria.add(c.key);
+      setDirty(true);
+      updateTotal();
+    });
+    number.addEventListener("input", () => {
+      if (number.value === "") {
+        touchedCriteria.delete(c.key);
+      } else {
+        const value = Math.min(c.max, Math.max(0, Number(number.value)));
+        number.value = value;
+        range.value = value;
+        touchedCriteria.add(c.key);
+      }
+      setDirty(true);
+      updateTotal();
+    });
   });
   updateTotal();
   showView("score");
 }
 
+$("comment-input").addEventListener("input", () => {
+  if (activePlan) setDirty(true);
+});
+
 function updateTotal() {
   let total = 0;
   CRITERIA.forEach((c) => {
-    const v = Number($(`range-${c.key}`).value);
-    $(`val-${c.key}`).textContent = v;
+    const input = $(`number-${c.key}`);
+    const v = input.value === "" ? 0 : Number(input.value);
+    $(`val-${c.key}`).textContent = touchedCriteria.has(c.key) ? `${v} 分` : "尚未評分";
     total += v;
   });
-  $("total-display").textContent = `${total} / 100`;
+  $("total-display").textContent = touchedCriteria.size === CRITERIA.length ? `${total} / 100` : `— / 100`;
 }
 
 $("save-btn").addEventListener("click", async () => {
   if (!activePlan || !currentCode) return;
+  if (touchedCriteria.size !== CRITERIA.length) {
+    $("save-msg").innerHTML = `<div class="msg error">請完成全部四個評分項目後再儲存。</div>`;
+    return;
+  }
   const payload = { code: currentCode, name: currentName, planId: activePlan.id, planName: activePlan.name };
-  CRITERIA.forEach((c) => (payload[c.key] = Number($(`range-${c.key}`).value)));
+  CRITERIA.forEach((c) => (payload[c.key] = Number($(`number-${c.key}`).value)));
   payload.comment = $("comment-input").value.trim();
   payload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
 
   $("save-btn").disabled = true;
+  $("save-btn").textContent = "儲存中…";
+  $("save-state").textContent = "正在儲存";
   try {
     await db.collection("scores").doc(currentCode).collection("entries").doc(activePlan.id).set(payload, { merge: true });
     $("save-msg").innerHTML = `<div class="msg ok">已儲存！可以隨時回來修改。</div>`;
+    scoreMap[activePlan.id] = payload;
+    dirty = false;
+    const now = new Intl.DateTimeFormat("zh-TW", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+    $("save-state").textContent = `已於 ${now} 儲存`;
+    const currentIndex = plansCache.findIndex((p) => p.id === activePlan.id);
+    $("next-plan-btn").hidden = currentIndex >= plansCache.length - 1;
+    const doneCount = plansCache.filter((item) => scoreMap[item.id]).length;
+    $("progress-done").textContent = `已完成 ${doneCount} 份`;
+    $("progress-fill").style.width = `${(doneCount / plansCache.length) * 100}%`;
   } catch (e) {
     console.error(e);
     $("save-msg").innerHTML = `<div class="msg error">儲存失敗，請確認網路連線後再試一次。</div>`;
+    $("save-state").textContent = "尚未儲存，請再試一次";
   }
   $("save-btn").disabled = false;
+  $("save-btn").textContent = "儲存評分";
+});
+
+$("next-plan-btn").addEventListener("click", () => {
+  const currentIndex = plansCache.findIndex((p) => p.id === activePlan.id);
+  const next = plansCache[currentIndex + 1];
+  if (next) {
+    openScore(next, scoreMap[next.id]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 });
 
 tryAutoLogin();
