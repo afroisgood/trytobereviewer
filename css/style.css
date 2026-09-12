@@ -426,7 +426,8 @@ textarea {
   transform: translateY(-2px);
 }
 .rank-row.top3 {
-  border-left-color: var(--yellow);
+  background: var(--yellow);
+  border-left-color: var(--coral-dark);
 }
 .rank-row .rank-num {
   font-size: 1.6rem;
@@ -434,6 +435,9 @@ textarea {
   color: var(--coral);
   width: 40px;
   flex-shrink: 0;
+}
+.rank-row.top3 .rank-num {
+  color: var(--ink);
 }
 .rank-row .rank-name {
   flex: 1;
