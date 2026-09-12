@@ -415,14 +415,18 @@ textarea {
   background: var(--cream);
   color: var(--ink);
   border-radius: 16px;
-  padding: 18px 24px;
+  padding: 18px 24px 18px 20px;
   margin-bottom: 14px;
   cursor: pointer;
   box-shadow: 0 6px 16px var(--shadow);
   transition: transform 0.15s ease;
+  border-left: 4px solid transparent;
 }
 .rank-row:hover {
   transform: translateY(-2px);
+}
+.rank-row.top3 {
+  border-left-color: var(--yellow);
 }
 .rank-row .rank-num {
   font-size: 1.6rem;

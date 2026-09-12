@@ -91,7 +91,7 @@ function renderRanking() {
   rankList.innerHTML = "";
   rows.forEach((r, i) => {
     const row = document.createElement("div");
-    row.className = "rank-row";
+    row.className = "rank-row" + (i < 3 ? " top3" : "");
     row.innerHTML = `
       <span class="rank-num">${i + 1}</span>
       <span class="rank-name">${r.plan.name}<br><span class="hint">已評分 ${r.count} 人</span></span>
