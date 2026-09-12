@@ -26,7 +26,7 @@ html, body {
 }
 
 body {
-  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-family: "Huninn", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   background: var(--green-deep);
   background-image:
     radial-gradient(circle at 15% 10%, rgba(232, 185, 63, 0.12), transparent 45%),
