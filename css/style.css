@@ -438,24 +438,39 @@ textarea {
   font-weight: 800;
 }
 
-/* 回饋卡片 */
+/* 回饋卡片（現場大螢幕用，字級對齊計畫標題層級，確保遠距離看得清楚） */
 .feedback-item {
   background: #fff;
+  color: var(--ink);
   border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
   text-align: left;
 }
 .feedback-item .fi-head {
   display: flex;
   justify-content: space-between;
-  font-weight: 700;
-  margin-bottom: 4px;
+  align-items: baseline;
+  gap: 16px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.feedback-item .fi-head .fi-score {
+  color: var(--coral-dark);
+  flex-shrink: 0;
 }
 .feedback-item .fi-scores {
-  font-size: 0.8rem;
-  color: #6a7a6d;
-  margin-bottom: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.feedback-item .fi-comment {
+  font-size: 1.15rem;
+  color: var(--ink);
+  line-height: 1.6;
 }
 
 /* 後台表格 */

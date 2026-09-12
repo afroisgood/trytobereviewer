@@ -116,9 +116,9 @@ function showDetail(plan) {
     item.className = "feedback-item";
     const scoreParts = CRITERIA.map((c) => `${c.label} ${e[c.key] ?? 0}`).join("・");
     item.innerHTML = `
-      <div class="fi-head"><span>${e.name || e.code}</span><span>${calcTotal(e)} 分</span></div>
+      <div class="fi-head"><span>${e.name || e.code}</span><span class="fi-score">${calcTotal(e)} 分</span></div>
       <div class="fi-scores">${scoreParts}</div>
-      <div>${e.comment ? e.comment.replace(/</g, "&lt;") : "（無文字回饋）"}</div>
+      <div class="fi-comment">${e.comment ? e.comment.replace(/</g, "&lt;") : "（無文字回饋）"}</div>
     `;
     listEl.appendChild(item);
   });
