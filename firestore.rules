@@ -42,5 +42,12 @@ service cloud.firestore {
         allow write: if isAdmin() || exists(/databases/$(database)/documents/participants/$(code));
       }
     }
+
+    // 上面的固定層級規則只適用於「指定路徑」的讀取（例如 scores/A01/entries/xxx）。
+    // screen.html 和後台「評分總覽」用 collectionGroup("entries") 一次跨所有人查詢所有評分，
+    // Firestore 對這種跨父層查詢一定要另外用萬用字元規則才會生效，否則即使上面允許讀取也會被拒絕。
+    match /{path=**}/entries/{planId} {
+      allow read: if true;
+    }
   }
 }

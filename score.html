@@ -10,7 +10,8 @@
 <div class="wrap">
   <div class="top-bar">
     <a class="back-link" href="index.html">← 返回</a>
-    <h1>評分系統</h1>
+    <h1 style="flex:1;">評分系統</h1>
+    <button class="btn secondary small" id="logout-btn" style="display:none;">登出</button>
   </div>
 
   <!-- 登入畫面 -->
@@ -27,7 +28,6 @@
   <div id="view-list" style="display:none;">
     <div class="card" style="margin-bottom:20px;">
       <p class="muted" style="margin:0;">目前登入：<strong id="who" style="color:var(--ink);"></strong></p>
-      <button class="btn secondary small" id="logout-btn" style="margin-top:10px;">登出</button>
     </div>
     <div id="plan-list"></div>
   </div>
@@ -68,6 +68,7 @@ function showView(name) {
   ["login", "list", "score"].forEach((v) => {
     $("view-" + v).style.display = v === name ? "block" : "none";
   });
+  $("logout-btn").style.display = name === "login" ? "none" : "inline-block";
 }
 
 async function tryAutoLogin() {

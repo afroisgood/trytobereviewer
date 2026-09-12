@@ -45,9 +45,8 @@
         <div id="stage-msg"></div>
         <div class="big-buttons" style="margin-bottom:16px;">
           <button class="btn stage-btn" data-stage="waiting">尚未開始</button>
-          <button class="btn stage-btn" data-stage="reading">計畫閱讀</button>
+          <button class="btn stage-btn" data-stage="text">文字顯示</button>
           <button class="btn stage-btn" data-stage="review">計畫審查（即時排名）</button>
-          <button class="btn stage-btn" data-stage="feedback">總回饋</button>
         </div>
         <p class="muted">目前階段：<strong id="current-stage-label" style="color:var(--ink);">—</strong></p>
       </div>
@@ -60,15 +59,10 @@
       </div>
 
       <div class="card">
-        <h2>「計畫閱讀」滿版文字</h2>
-        <textarea id="reading-input" placeholder="現場大螢幕在此階段顯示的文字內容"></textarea>
-        <button class="btn small" id="save-reading-btn">儲存內容</button>
-      </div>
-
-      <div class="card">
-        <h2>「總回饋」滿版文字</h2>
-        <textarea id="feedback-input" placeholder="現場大螢幕在此階段顯示的文字內容"></textarea>
-        <button class="btn small" id="save-feedback-btn">儲存內容</button>
+        <h2>「文字顯示」階段內容</h2>
+        <p class="muted">現場大螢幕在「文字顯示」階段會滿版顯示這段文字（不會另外顯示標題），可重複用來放計畫閱讀說明、總回饋內容等，隨時改隨時同步。</p>
+        <textarea id="display-text-input" placeholder="現場大螢幕在此階段顯示的文字內容"></textarea>
+        <button class="btn small" id="save-display-text-btn">儲存內容</button>
       </div>
     </div>
 

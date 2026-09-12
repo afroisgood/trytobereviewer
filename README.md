@@ -49,7 +49,7 @@ python -m http.server 8000
 1. 開 `admin.html`，用管理員帳密登入。
 2. 「計畫書管理」分頁新增 8 份計畫書（名稱＋Google Drive 連結＋排序）。
 3. 「參與者名單」分頁用「批次新增」貼入 20 組代碼（格式：`代碼,姓名`，一行一組）。
-4. 「階段控制」分頁填入簡章連結、計畫閱讀/總回饋的文字內容。
+4. 「階段控制」分頁填入簡章連結、「文字顯示」階段要用的文字內容。
 5. 開 `score.html`，輸入一組剛剛建立的代碼登入，測試評分與回饋是否能儲存、修改。
 6. 開 `screen.html`，在後台切換階段，確認畫面即時跟著換（Firestore 是即時推播，通常 1 秒內就會更新，不用重新整理）。
 
@@ -74,7 +74,7 @@ git push -u origin main
 
 | Collection | 文件 ID | 欄位 | 說明 |
 |---|---|---|---|
-| `config` | `state` | `stage`, `brochureUrl`, `readingText`, `feedbackText` | 全站唯一一份，控制現場展示內容 |
+| `config` | `state` | `stage`（`waiting`/`text`/`review`）, `brochureUrl`, `displayText` | 全站唯一一份，控制現場展示內容。`text` 階段會滿版顯示 `displayText`（不顯示階段標題），可重複用於計畫閱讀說明、總回饋等任何時機 |
 | `plans` | 自動 ID | `name`, `url`, `order` | 8 份計畫書 |
 | `participants` | 代碼（如 `A01`） | `name` | 評分代碼名單 |
 | `scores/{代碼}/entries` | 計畫書 ID | `code`, `name`, `planId`, `planName`, `c1~c4`, `comment`, `updatedAt` | 每位參與者對每份計畫書的評分 |

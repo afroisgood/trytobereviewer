@@ -65,19 +65,15 @@ function watchStage() {
     const data = snap.exists ? snap.data() : {};
     $("current-stage-label").textContent = STAGE_LABELS[data.stage || "waiting"];
     if (document.activeElement !== $("brochure-input")) $("brochure-input").value = data.brochureUrl || "";
-    if (document.activeElement !== $("reading-input")) $("reading-input").value = data.readingText || "";
-    if (document.activeElement !== $("feedback-input")) $("feedback-input").value = data.feedbackText || "";
+    if (document.activeElement !== $("display-text-input")) $("display-text-input").value = data.displayText || "";
   });
 }
 
 $("save-brochure-btn").addEventListener("click", () =>
   db.collection("config").doc("state").set({ brochureUrl: $("brochure-input").value.trim() }, { merge: true })
 );
-$("save-reading-btn").addEventListener("click", () =>
-  db.collection("config").doc("state").set({ readingText: $("reading-input").value }, { merge: true })
-);
-$("save-feedback-btn").addEventListener("click", () =>
-  db.collection("config").doc("state").set({ feedbackText: $("feedback-input").value }, { merge: true })
+$("save-display-text-btn").addEventListener("click", () =>
+  db.collection("config").doc("state").set({ displayText: $("display-text-input").value }, { merge: true })
 );
 
 // ---------- 計畫書管理 ----------
@@ -222,7 +218,7 @@ function renderScoresTable() {
   }
   let html = `<table class="admin-table"><tr><th>計畫書</th><th>代碼</th><th>姓名</th>`;
   CRITERIA.forEach((c) => (html += `<th>${c.label}</th>`));
-  html += `<th>總分</th><th>回饋</th></tr>`;
+  html += `<th>總分</th><th>回饋</th><th></th></tr>`;
   rows
     .sort((a, b) => (a.planName || "").localeCompare(b.planName || ""))
     .forEach((e) => {
@@ -233,8 +229,20 @@ function renderScoresTable() {
       CRITERIA.forEach((c) => (html += `<td>${e[c.key] ?? 0}</td>`));
       html += `<td><strong>${calcTotal(e)}</strong></td>
         <td>${(e.comment || "").replace(/</g, "&lt;")}</td>
+        <td><button class="btn small secondary" data-del-score="${e.code}|${e.planId}" style="color:#a13324; border-color:#a13324;">刪除</button></td>
       </tr>`;
     });
   html += `</table>`;
   wrap.innerHTML = html;
+  wrap.querySelectorAll("[data-del-score]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("確定刪除這筆評分與回饋？此動作無法復原。")) return;
+      const [code, planId] = btn.dataset.delScore.split("|");
+      try {
+        await db.collection("scores").doc(code).collection("entries").doc(planId).delete();
+      } catch (e) {
+        alert("刪除失敗：" + e.message);
+      }
+    });
+  });
 }

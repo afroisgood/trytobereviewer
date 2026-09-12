@@ -17,9 +17,8 @@ const CRITERIA = [
 
 const STAGE_LABELS = {
   waiting: "尚未開始",
-  reading: "計畫閱讀",
+  text: "文字顯示",
   review: "計畫審查",
-  feedback: "總回饋",
 };
 
 function calcTotal(scoreDoc) {
